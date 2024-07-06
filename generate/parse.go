@@ -6,12 +6,10 @@ import (
 	goParser "go/parser"
 	goToken "go/token"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/parser"
 	"github.com/vektah/gqlparser/v2/validator"
@@ -87,27 +85,7 @@ func getAndValidateQueries(basedir string, filenames StringList, schema *ast.Sch
 }
 
 func expandFilenames(globs []string) ([]string, error) {
-	uniqFilenames := make(map[string]bool, len(globs))
-	for _, glob := range globs {
-		// SplitPattern in case the path is absolute or something; a valid path
-		// isn't necessarily a valid glob-pattern.
-		base, pattern := doublestar.SplitPattern(glob)
-		matches, err := doublestar.Glob(os.DirFS(base), pattern, doublestar.WithFilesOnly())
-		if err != nil {
-			return nil, errorf(nil, "can't expand file-glob %v: %v", glob, err)
-		}
-		if len(matches) == 0 {
-			return nil, errorf(nil, "%v did not match any files", glob)
-		}
-		for _, match := range matches {
-			uniqFilenames[path.Join(base, match)] = true
-		}
-	}
-	filenames := make([]string, 0, len(uniqFilenames))
-	for filename := range uniqFilenames {
-		filenames = append(filenames, filename)
-	}
-	return filenames, nil
+	return globs, nil
 }
 
 func getQueries(basedir string, globs StringList) (*ast.QueryDocument, error) {
@@ -170,7 +148,8 @@ func getQueriesFromString(text string, basedir, filename string) (*ast.QueryDocu
 
 	// Cf. gqlparser.LoadQuery
 	document, graphqlError := parser.ParseQuery(
-		&ast.Source{Name: filename, Input: text})
+		&ast.Source{Name: filename, Input: text},
+	)
 	if graphqlError != nil { // ParseQuery returns type *graphql.Error, yuck
 		return nil, errorf(nil, "invalid query-spec file %v: %v", filename, graphqlError)
 	}
@@ -186,40 +165,42 @@ func getQueriesFromGo(text string, basedir, filename string) ([]*ast.QueryDocume
 	}
 
 	var retval []*ast.QueryDocument
-	goAst.Inspect(f, func(node goAst.Node) bool {
-		if err != nil {
-			return false // don't bother to recurse if something already failed
-		}
+	goAst.Inspect(
+		f, func(node goAst.Node) bool {
+			if err != nil {
+				return false // don't bother to recurse if something already failed
+			}
 
-		basicLit, ok := node.(*goAst.BasicLit)
-		if !ok || basicLit.Kind != goToken.STRING {
-			return true // recurse
-		}
+			basicLit, ok := node.(*goAst.BasicLit)
+			if !ok || basicLit.Kind != goToken.STRING {
+				return true // recurse
+			}
 
-		var value string
-		value, err = strconv.Unquote(basicLit.Value)
-		if err != nil {
-			return false
-		}
+			var value string
+			value, err = strconv.Unquote(basicLit.Value)
+			if err != nil {
+				return false
+			}
 
-		if !strings.HasPrefix(strings.TrimSpace(value), "# @genqlient") {
+			if !strings.HasPrefix(strings.TrimSpace(value), "# @genqlient") {
+				return true
+			}
+
+			// We put the filename as <real filename>:<line>, which errors.go knows
+			// how to parse back out (since it's what gqlparser will give to us in
+			// our errors).
+			pos := fset.Position(basicLit.Pos())
+			fakeFilename := fmt.Sprintf("%v:%v", pos.Filename, pos.Line)
+			var query *ast.QueryDocument
+			query, err = getQueriesFromString(value, basedir, fakeFilename)
+			if err != nil {
+				return false
+			}
+			retval = append(retval, query)
+
 			return true
-		}
-
-		// We put the filename as <real filename>:<line>, which errors.go knows
-		// how to parse back out (since it's what gqlparser will give to us in
-		// our errors).
-		pos := fset.Position(basicLit.Pos())
-		fakeFilename := fmt.Sprintf("%v:%v", pos.Filename, pos.Line)
-		var query *ast.QueryDocument
-		query, err = getQueriesFromString(value, basedir, fakeFilename)
-		if err != nil {
-			return false
-		}
-		retval = append(retval, query)
-
-		return true
-	})
+		},
+	)
 
 	return retval, err
 }

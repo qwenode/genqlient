@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Khan/genqlient/internal/testutil"
+	"github.com/qwenode/genqlient/internal/testutil"
 	"gopkg.in/yaml.v2"
 )
 
@@ -74,53 +74,61 @@ func TestGenerate(t *testing.T) {
 		goFilename := sourceFilename + ".go"
 		queriesFilename := sourceFilename + ".json"
 
-		t.Run(sourceFilename, func(t *testing.T) {
-			generated, err := Generate(&Config{
-				Schema:           []string{filepath.Join(dataDir, "schema.graphql")},
-				Operations:       []string{filepath.Join(dataDir, sourceFilename)},
-				Package:          "test",
-				Generated:        goFilename,
-				ExportOperations: queriesFilename,
-				ContextType:      "-",
-				Bindings: map[string]*TypeBinding{
-					"ID":       {Type: "github.com/Khan/genqlient/internal/testutil.ID"},
-					"DateTime": {Type: "time.Time"},
-					"Date": {
-						Type:        "time.Time",
-						Marshaler:   "github.com/Khan/genqlient/internal/testutil.MarshalDate",
-						Unmarshaler: "github.com/Khan/genqlient/internal/testutil.UnmarshalDate",
+		t.Run(
+			sourceFilename, func(t *testing.T) {
+				generated, err := Generate(
+					&Config{
+						Schema:           []string{filepath.Join(dataDir, "schema.graphql")},
+						Operations:       []string{filepath.Join(dataDir, sourceFilename)},
+						Package:          "test",
+						Generated:        goFilename,
+						ExportOperations: queriesFilename,
+						ContextType:      "-",
+						Bindings: map[string]*TypeBinding{
+							"ID":       {Type: "github.com/qwenode/genqlient/internal/testutil.ID"},
+							"DateTime": {Type: "time.Time"},
+							"Date": {
+								Type:        "time.Time",
+								Marshaler:   "github.com/qwenode/genqlient/internal/testutil.MarshalDate",
+								Unmarshaler: "github.com/qwenode/genqlient/internal/testutil.UnmarshalDate",
+							},
+							"Junk":        {Type: "interface{}"},
+							"ComplexJunk": {Type: "[]map[string]*[]*map[string]interface{}"},
+							"Pokemon": {
+								Type:              "github.com/qwenode/genqlient/internal/testutil.Pokemon",
+								ExpectExactFields: "{ species level }",
+							},
+							"PokemonInput": {Type: "github.com/qwenode/genqlient/internal/testutil.Pokemon"},
+						},
+						AllowBrokenFeatures: true,
 					},
-					"Junk":        {Type: "interface{}"},
-					"ComplexJunk": {Type: "[]map[string]*[]*map[string]interface{}"},
-					"Pokemon": {
-						Type:              "github.com/Khan/genqlient/internal/testutil.Pokemon",
-						ExpectExactFields: "{ species level }",
-					},
-					"PokemonInput": {Type: "github.com/Khan/genqlient/internal/testutil.Pokemon"},
-				},
-				AllowBrokenFeatures: true,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			for filename, content := range generated {
-				t.Run(filename, func(t *testing.T) {
-					testutil.Cupaloy.SnapshotT(t, string(content))
-				})
-			}
-
-			t.Run("Build", func(t *testing.T) {
-				if testing.Short() {
-					t.Skip("skipping build due to -short")
-				}
-
-				err := buildGoFile(sourceFilename, generated[goFilename])
+				)
 				if err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
-			})
-		})
+
+				for filename, content := range generated {
+					t.Run(
+						filename, func(t *testing.T) {
+							testutil.Cupaloy.SnapshotT(t, string(content))
+						},
+					)
+				}
+
+				t.Run(
+					"Build", func(t *testing.T) {
+						if testing.Short() {
+							t.Skip("skipping build due to -short")
+						}
+
+						err := buildGoFile(sourceFilename, generated[goFilename])
+						if err != nil {
+							t.Error(err)
+						}
+					},
+				)
+			},
+		)
 	}
 }
 
@@ -167,18 +175,18 @@ func TestGenerateWithConfig(t *testing.T) {
 			ExportOperations: "operations.json",
 		}},
 		{"CustomContext", "", nil, &Config{
-			ContextType: "github.com/Khan/genqlient/internal/testutil.MyContext",
+			ContextType: "github.com/qwenode/genqlient/internal/testutil.MyContext",
 		}},
 		{"CustomContextWithAlias", "", nil, &Config{
-			ContextType: "github.com/Khan/genqlient/internal/testutil/junk---fun.name.MyContext",
+			ContextType: "github.com/qwenode/genqlient/internal/testutil/junk---fun.name.MyContext",
 		}},
 		{"StructReferences", "", []string{"InputObject.graphql", "QueryWithStructs.graphql"}, &Config{
 			StructReferences: true,
 			Bindings: map[string]*TypeBinding{
 				"Date": {
 					Type:        "time.Time",
-					Marshaler:   "github.com/Khan/genqlient/internal/testutil.MarshalDate",
-					Unmarshaler: "github.com/Khan/genqlient/internal/testutil.UnmarshalDate",
+					Marshaler:   "github.com/qwenode/genqlient/internal/testutil.MarshalDate",
+					Unmarshaler: "github.com/qwenode/genqlient/internal/testutil.UnmarshalDate",
 				},
 			},
 		}},
@@ -188,28 +196,28 @@ func TestGenerateWithConfig(t *testing.T) {
 			Bindings: map[string]*TypeBinding{
 				"Date": {
 					Type:        "time.Time",
-					Marshaler:   "github.com/Khan/genqlient/internal/testutil.MarshalDate",
-					Unmarshaler: "github.com/Khan/genqlient/internal/testutil.UnmarshalDate",
+					Marshaler:   "github.com/qwenode/genqlient/internal/testutil.MarshalDate",
+					Unmarshaler: "github.com/qwenode/genqlient/internal/testutil.UnmarshalDate",
 				},
 			},
 		}},
 		{"PackageBindings", "", nil, &Config{
 			PackageBindings: []*PackageBinding{
-				{Package: "github.com/Khan/genqlient/internal/testutil"},
+				{Package: "github.com/qwenode/genqlient/internal/testutil"},
 			},
 		}},
 		{"NoContext", "", nil, &Config{
 			ContextType: "-",
 		}},
 		{"ClientGetter", "", nil, &Config{
-			ClientGetter: "github.com/Khan/genqlient/internal/testutil.GetClientFromContext",
+			ClientGetter: "github.com/qwenode/genqlient/internal/testutil.GetClientFromContext",
 		}},
 		{"ClientGetterCustomContext", "", nil, &Config{
-			ClientGetter: "github.com/Khan/genqlient/internal/testutil.GetClientFromMyContext",
-			ContextType:  "github.com/Khan/genqlient/internal/testutil.MyContext",
+			ClientGetter: "github.com/qwenode/genqlient/internal/testutil.GetClientFromMyContext",
+			ContextType:  "github.com/qwenode/genqlient/internal/testutil.MyContext",
 		}},
 		{"ClientGetterNoContext", "", nil, &Config{
-			ClientGetter: "github.com/Khan/genqlient/internal/testutil.GetClientFromNowhere",
+			ClientGetter: "github.com/qwenode/genqlient/internal/testutil.GetClientFromNowhere",
 			ContextType:  "-",
 		}},
 		{"Extensions", "", nil, &Config{
@@ -228,7 +236,7 @@ func TestGenerateWithConfig(t *testing.T) {
 		}},
 		{"OptionalGeneric", "", []string{"ListInput.graphql", "QueryWithSlices.graphql"}, &Config{
 			Optional:            "generic",
-			OptionalGenericType: "github.com/Khan/genqlient/internal/testutil.Option",
+			OptionalGenericType: "github.com/qwenode/genqlient/internal/testutil.Option",
 		}},
 		{"EnumRawCasingAll", "", []string{"QueryWithEnums.graphql"}, &Config{
 			Casing: Casing{
@@ -252,43 +260,51 @@ func TestGenerateWithConfig(t *testing.T) {
 	for _, test := range tests {
 		config := test.config
 		baseDir := filepath.Join(dataDir, test.baseDir)
-		t.Run(test.name, func(t *testing.T) {
-			err := config.ValidateAndFillDefaults(baseDir)
-			config.Schema = []string{filepath.Join(dataDir, "schema.graphql")}
-			if test.operations == nil {
-				config.Operations = []string{filepath.Join(dataDir, sourceFilename)}
-			} else {
-				config.Operations = make([]string, len(test.operations))
-				for i := range test.operations {
-					config.Operations[i] = filepath.Join(dataDir, test.operations[i])
+		t.Run(
+			test.name, func(t *testing.T) {
+				err := config.ValidateAndFillDefaults(baseDir)
+				config.Schema = []string{filepath.Join(dataDir, "schema.graphql")}
+				if test.operations == nil {
+					config.Operations = []string{filepath.Join(dataDir, sourceFilename)}
+				} else {
+					config.Operations = make([]string, len(test.operations))
+					for i := range test.operations {
+						config.Operations[i] = filepath.Join(dataDir, test.operations[i])
+					}
 				}
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			generated, err := Generate(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			for filename, content := range generated {
-				t.Run(filename, func(t *testing.T) {
-					testutil.Cupaloy.SnapshotT(t, string(content))
-				})
-			}
-
-			t.Run("Build", func(t *testing.T) {
-				if testing.Short() {
-					t.Skip("skipping build due to -short")
-				}
-
-				err := buildGoFile(sourceFilename,
-					generated[config.Generated])
 				if err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
-			})
-		})
+				generated, err := Generate(config)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				for filename, content := range generated {
+					t.Run(
+						filename, func(t *testing.T) {
+							testutil.Cupaloy.SnapshotT(t, string(content))
+						},
+					)
+				}
+
+				t.Run(
+					"Build", func(t *testing.T) {
+						if testing.Short() {
+							t.Skip("skipping build due to -short")
+						}
+
+						err := buildGoFile(
+							sourceFilename,
+							generated[config.Generated],
+						)
+						if err != nil {
+							t.Error(err)
+						}
+					},
+				)
+			},
+		)
 	}
 }
 
@@ -330,28 +346,32 @@ func TestGenerateErrors(t *testing.T) {
 			}
 		}
 
-		t.Run(testFilename, func(t *testing.T) {
-			_, err := Generate(&Config{
-				Schema:      []string{filepath.Join(errorsDir, schemaFilename)},
-				Operations:  []string{filepath.Join(errorsDir, sourceFilename)},
-				Package:     "test",
-				Generated:   os.DevNull,
-				ContextType: "context.Context",
-				Bindings: map[string]*TypeBinding{
-					"ValidScalar":   {Type: "string"},
-					"InvalidScalar": {Type: "bogus"},
-					"Pokemon": {
-						Type:              "github.com/Khan/genqlient/internal/testutil.Pokemon",
-						ExpectExactFields: "{ species level }",
+		t.Run(
+			testFilename, func(t *testing.T) {
+				_, err := Generate(
+					&Config{
+						Schema:      []string{filepath.Join(errorsDir, schemaFilename)},
+						Operations:  []string{filepath.Join(errorsDir, sourceFilename)},
+						Package:     "test",
+						Generated:   os.DevNull,
+						ContextType: "context.Context",
+						Bindings: map[string]*TypeBinding{
+							"ValidScalar":   {Type: "string"},
+							"InvalidScalar": {Type: "bogus"},
+							"Pokemon": {
+								Type:              "github.com/qwenode/genqlient/internal/testutil.Pokemon",
+								ExpectExactFields: "{ species level }",
+							},
+						},
+						AllowBrokenFeatures: true,
 					},
-				},
-				AllowBrokenFeatures: true,
-			})
-			if err == nil {
-				t.Fatal("expected an error")
-			}
+				)
+				if err == nil {
+					t.Fatal("expected an error")
+				}
 
-			testutil.Cupaloy.SnapshotT(t, err.Error())
-		})
+				testutil.Cupaloy.SnapshotT(t, err.Error())
+			},
+		)
 	}
 }

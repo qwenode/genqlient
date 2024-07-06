@@ -2,7 +2,7 @@
 // and documentation of its configuration options.  For general usage
 // documentation, see the project [GitHub].
 //
-// [GitHub]: https://github.com/Khan/genqlient
+// [GitHub]: https://github.com/qwenode/genqlient
 package generate
 
 import (
@@ -42,15 +42,19 @@ func readConfigGenerateAndWrite(configFilename string) error {
 	for filename, content := range generated {
 		err = os.MkdirAll(filepath.Dir(filename), 0o755)
 		if err != nil {
-			return errorf(nil,
+			return errorf(
+				nil,
 				"could not create parent directory for generated file %v: %v",
-				filename, err)
+				filename, err,
+			)
 		}
 
 		err = os.WriteFile(filename, content, 0o644)
 		if err != nil {
-			return errorf(nil, "could not write generated file %v: %v",
-				filename, err)
+			return errorf(
+				nil, "could not write generated file %v: %v",
+				filename, err,
+			)
 		}
 	}
 	return nil
@@ -62,15 +66,17 @@ type cliArgs struct {
 }
 
 func (cliArgs) Description() string {
-	return strings.TrimSpace(`
+	return strings.TrimSpace(
+		`
 Generates GraphQL client code for a given schema and queries.
-See https://github.com/Khan/genqlient for full documentation.
-`)
+See https://github.com/qwenode/genqlient for full documentation.
+`,
+	)
 }
 
 // Main is the command-line entrypoint to genqlient; it's equivalent to calling
 //
-//	go run github.com/Khan/genqlient
+//	go run github.com/qwenode/genqlient
 //
 // For lower-level control over genqlient's operation, see [Generate].
 func Main() {
@@ -80,9 +86,11 @@ func Main() {
 			os.Exit(1)
 		}
 	}
-
+	x, _ := os.Getwd()
+	abs, _ := filepath.Abs(x)
 	var args cliArgs
 	arg.MustParse(&args)
+	args.ConfigFilename = filepath.Join(abs, "genqlient.yaml")
 	if args.Init {
 		filename := args.ConfigFilename
 		if filename == "" {

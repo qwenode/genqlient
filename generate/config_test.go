@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Khan/genqlient/internal/testutil"
+	"github.com/qwenode/genqlient/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,18 +40,20 @@ func TestFindCfg(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			defer func() {
-				require.NoError(t, os.Chdir(cwd), "Test cleanup failed")
-			}()
+		t.Run(
+			name, func(t *testing.T) {
+				defer func() {
+					require.NoError(t, os.Chdir(cwd), "Test cleanup failed")
+				}()
 
-			err = os.Chdir(tc.startDir)
-			require.NoError(t, err)
+				err = os.Chdir(tc.startDir)
+				require.NoError(t, err)
 
-			path, err := findCfg()
-			assert.Equal(t, tc.expectedCfg, path)
-			assert.Equal(t, tc.expectedErr, err)
-		})
+				path, err := findCfg()
+				assert.Equal(t, tc.expectedCfg, path)
+				assert.Equal(t, tc.expectedErr, err)
+			},
+		)
 	}
 }
 
@@ -86,14 +88,16 @@ func TestFindCfgInDir(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			path := findCfgInDir(tc.startDir)
-			if tc.found {
-				assert.NotEmpty(t, path)
-			} else {
-				assert.Empty(t, path)
-			}
-		})
+		t.Run(
+			name, func(t *testing.T) {
+				path := findCfgInDir(tc.startDir)
+				if tc.found {
+					assert.NotEmpty(t, path)
+				} else {
+					assert.Empty(t, path)
+				}
+			},
+		)
 	}
 }
 
@@ -102,7 +106,8 @@ func TestAbsoluteAndRelativePathsInConfigFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	config, err := ReadAndValidateConfig(
-		filepath.Join(cwd, findConfigDir, "current", "genqlient.yaml"))
+		filepath.Join(cwd, findConfigDir, "current", "genqlient.yaml"),
+	)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(config.Schema))
@@ -130,25 +135,31 @@ func testAllSnapshots(
 		if name[0] == '.' {
 			continue // editor backup files, etc.
 		}
-		t.Run(name, func(t *testing.T) {
-			filename := filepath.Join(dir, file.Name())
-			testfunc(t, filename)
-		})
+		t.Run(
+			name, func(t *testing.T) {
+				filename := filepath.Join(dir, file.Name())
+				testfunc(t, filename)
+			},
+		)
 	}
 }
 
 func TestValidConfigs(t *testing.T) {
-	testAllSnapshots(t, validConfigDir, func(t *testing.T, filename string) {
-		config, err := ReadAndValidateConfig(filename)
-		require.NoError(t, err)
-		testutil.Cupaloy.SnapshotT(t, config)
-	})
+	testAllSnapshots(
+		t, validConfigDir, func(t *testing.T, filename string) {
+			config, err := ReadAndValidateConfig(filename)
+			require.NoError(t, err)
+			testutil.Cupaloy.SnapshotT(t, config)
+		},
+	)
 }
 
 func TestInvalidConfigs(t *testing.T) {
-	testAllSnapshots(t, invalidConfigDir, func(t *testing.T, filename string) {
-		_, err := ReadAndValidateConfig(filename)
-		require.Error(t, err)
-		testutil.Cupaloy.SnapshotT(t, err.Error())
-	})
+	testAllSnapshots(
+		t, invalidConfigDir, func(t *testing.T, filename string) {
+			_, err := ReadAndValidateConfig(filename)
+			require.Error(t, err)
+			testutil.Cupaloy.SnapshotT(t, err.Error())
+		},
+	)
 }

@@ -39,7 +39,8 @@ func (g *generator) getType(
 				"a genqlient internal error, a conflict between user-specified "+
 				"type-names, or some very tricksy GraphQL field/type names: "+
 				"expected GraphQL type %s, got %s",
-			goName, typ.GraphQLTypeName(), graphQLName)
+			goName, typ.GraphQLTypeName(), graphQLName,
+		)
 	}
 
 	expectedSelectionSet := typ.SelectionSet()
@@ -48,7 +49,8 @@ func (g *generator) getType(
 			pos, "conflicting definition for %s; this can indicate either "+
 				"a genqlient internal error, a conflict between user-specified "+
 				"type-names, or some very tricksy GraphQL field/type names: %v",
-			goName, err)
+			goName, err,
+		)
 	}
 
 	return typ, nil
@@ -111,7 +113,8 @@ func (g *generator) convertOperation(
 	// thing, because we want to do a few things differently, and because we
 	// know we have an object type, so we can include only that case.
 	fields, err := g.convertSelectionSet(
-		namePrefix, operation.SelectionSet, baseType, queryOptions)
+		namePrefix, operation.SelectionSet, baseType, queryOptions,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +132,8 @@ func (g *generator) convertOperation(
 		GoName: name,
 		descriptionInfo: descriptionInfo{
 			CommentOverride: fmt.Sprintf(
-				"%v is returned by %v on success.", name, operation.Name),
+				"%v is returned by %v on success.", name, operation.Name,
+			),
 			GraphQLName: baseType.Name,
 			// omit the GraphQL description for baseType; it's uninteresting.
 		},
@@ -148,6 +152,7 @@ var builtinTypes = map[string]string{
 	"String":  "string",
 	"Boolean": "bool",
 	"ID":      "string",
+	"JSON":    "json.RawMessage",
 }
 
 // convertArguments builds the type of the GraphQL arguments to the given
@@ -211,7 +216,8 @@ func (g *generator) convertArguments(
 	goTyp, ok := goTypAgain.(*goStructType)
 	if !ok {
 		return nil, errorf(
-			operation.Position, "internal error: input type was %T", goTypAgain)
+			operation.Position, "internal error: input type was %T", goTypAgain,
+		)
 	}
 	return goTyp, nil
 }
@@ -240,14 +246,16 @@ func (g *generator) convertType(
 	if typ.Elem != nil {
 		// Type is a list.
 		elem, err := g.convertType(
-			namePrefix, typ.Elem, selectionSet, options, queryOptions)
+			namePrefix, typ.Elem, selectionSet, options, queryOptions,
+		)
 		return &goSliceType{elem}, err
 	}
 
 	// If this is a builtin type or custom scalar, just refer to it.
 	def := g.schema.Types[typ.Name()]
 	goTyp, err := g.convertDefinition(
-		namePrefix, def, typ.Position, selectionSet, options, queryOptions)
+		namePrefix, def, typ.Position, selectionSet, options, queryOptions,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -311,13 +319,16 @@ func (g *generator) convertDefinition(
 	if ok && options.Bind != "-" {
 		if options.TypeName != "" {
 			// The option position (in the query) is more useful here.
-			return nil, errorf(options.pos,
+			return nil, errorf(
+				options.pos,
 				"typename option conflicts with global binding for %s; "+
-					"use `bind: \"-\"` to override it", def.Name)
+					"use `bind: \"-\"` to override it", def.Name,
+			)
 		}
 		if def.Kind == ast.Object || def.Kind == ast.Interface || def.Kind == ast.Union {
 			err := g.validateBindingSelection(
-				def.Name, globalBinding, pos, selectionSet)
+				def.Name, globalBinding, pos, selectionSet,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -389,7 +400,8 @@ func (g *generator) convertDefinition(
 	switch kind {
 	case ast.Object:
 		fields, err := g.convertSelectionSet(
-			namePrefix, selectionSet, def, queryOptions)
+			namePrefix, selectionSet, def, queryOptions,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -431,7 +443,8 @@ func (g *generator) convertDefinition(
 
 		for i, field := range def.Fields {
 			_, fieldOptions, err := g.parsePrecedingComment(
-				field, def, field.Position, queryOptions)
+				field, def, field.Position, queryOptions,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -449,14 +462,15 @@ func (g *generator) convertDefinition(
 			// will be ignored?  We know field.Type is a scalar, enum, or input
 			// type.  But plumbing that is a bit tricky in practice.
 			fieldGoType, err := g.convertType(
-				namePrefix, field.Type, nil, fieldOptions, queryOptions)
+				namePrefix, field.Type, nil, fieldOptions, queryOptions,
+			)
 			if err != nil {
 				return nil, err
 			}
 
 			if !g.Config.StructReferences {
 				// Only do these validation when StructReferences are not used, as that can generate types that would not
-				// pass these validations. See https://github.com/Khan/genqlient/issues/342
+				// pass these validations. See https://github.com/qwenode/genqlient/issues/342
 
 				// Try to protect against generating field type that has possibility to send `null` to non-nullable graphQL
 				// type. This does not protect against lists/slices, as Go zero-slices are already serialized as `null`
@@ -464,7 +478,10 @@ func (g *generator) convertDefinition(
 				// And does not protect against custom MarshalJSON.
 				_, isPointer := fieldGoType.(*goPointerType)
 				if field.Type.NonNull && isPointer && !fieldOptions.GetOmitempty() {
-					return nil, errorf(pos, "pointer on non-null input field can only be used together with omitempty: %s.%s", name, field.Name)
+					return nil, errorf(
+						pos, "pointer on non-null input field can only be used together with omitempty: %s.%s", name,
+						field.Name,
+					)
 				}
 
 				if fieldOptions.GetOmitempty() && field.Type.NonNull && field.DefaultValue == nil {
@@ -478,14 +495,15 @@ func (g *generator) convertDefinition(
 				JSONName:    field.Name,
 				GraphQLName: field.Name,
 				Description: field.Description,
-				Omitempty:   fieldOptions.GetOmitempty(),
+				Omitempty:   !field.Type.NonNull, // fieldOptions.GetOmitempty(),
 			}
 		}
 		return goType, nil
 
 	case ast.Interface, ast.Union:
 		sharedFields, err := g.convertSelectionSet(
-			namePrefix, selectionSet, def, queryOptions)
+			namePrefix, selectionSet, def, queryOptions,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -500,7 +518,10 @@ func (g *generator) convertDefinition(
 
 		implementationTypes := g.schema.GetPossibleTypes(def)
 		// Make sure we generate stable output by sorting the types by name when we get them
-		sort.Slice(implementationTypes, func(i, j int) bool { return implementationTypes[i].Name < implementationTypes[j].Name })
+		sort.Slice(
+			implementationTypes,
+			func(i, j int) bool { return implementationTypes[i].Name < implementationTypes[j].Name },
+		)
 		goType := &goInterfaceType{
 			GoName:          name,
 			SharedFields:    sharedFields,
@@ -516,7 +537,8 @@ func (g *generator) convertDefinition(
 			// preprocessQueryDocument).  But in practice it doesn't really
 			// hurt, and would be extra work to avoid, so we just leave it.
 			implTyp, err := g.convertDefinition(
-				namePrefix, implDef, pos, selectionSet, options, queryOptions)
+				namePrefix, implDef, pos, selectionSet, options, queryOptions,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -525,7 +547,8 @@ func (g *generator) convertDefinition(
 			if !ok { // (should never happen on a valid schema)
 				return nil, errorf(
 					pos, "interface %s had non-object implementation %s",
-					def.Name, implDef.Name)
+					def.Name, implDef.Name,
+				)
 			}
 			goType.Implementations[i] = implStructTyp
 		}
@@ -542,11 +565,13 @@ func (g *generator) convertDefinition(
 		for i, val := range def.EnumValues {
 			goName := g.Config.Casing.enumValueName(name, def, val)
 			if conflict := goNames[goName]; conflict != nil {
-				return nil, errorf(val.Position,
+				return nil, errorf(
+					val.Position,
 					"enum values %s and %s have conflicting Go name %s; "+
 						"add 'all_enums: raw' or 'enums: %v: raw' "+
 						"to 'casing' in genqlient.yaml to fix",
-					val.Name, conflict.GraphQLName, goName, def.Name)
+					val.Name, conflict.GraphQLName, goName, def.Name,
+				)
 			}
 
 			goType.Values[i] = goEnumValue{
@@ -573,7 +598,8 @@ func (g *generator) convertDefinition(
 		// (If you had an entry in bindings, we would have returned it above.)
 		return nil, errorf(
 			pos, "unknown scalar %v: please add it to \"bindings\" in genqlient.yaml"+
-				"\nExample: https://github.com/Khan/genqlient/blob/main/example/genqlient.yaml#L12", def.Name)
+				"\nExample: https://github.com/qwenode/genqlient/blob/main/example/genqlient.yaml#L12", def.Name,
+		)
 	default:
 		return nil, errorf(pos, "unexpected kind: %v", def.Kind)
 	}
@@ -599,7 +625,8 @@ func (g *generator) convertSelectionSet(
 	fields := make([]*goStructField, 0, len(selectionSet))
 	for _, selection := range selectionSet {
 		_, selectionOptions, err := g.parsePrecedingComment(
-			selection, nil, selection.GetPosition(), queryOptions)
+			selection, nil, selection.GetPosition(), queryOptions,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -607,7 +634,8 @@ func (g *generator) convertSelectionSet(
 		switch selection := selection.(type) {
 		case *ast.Field:
 			field, err := g.convertField(
-				namePrefix, selection, selectionOptions, queryOptions)
+				namePrefix, selection, selectionOptions, queryOptions,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -623,7 +651,8 @@ func (g *generator) convertSelectionSet(
 			// (Note this will return nil, nil if the fragment doesn't apply to
 			// this type.)
 			fragmentFields, err := g.convertInlineFragment(
-				namePrefix, selection, containingTypedef, queryOptions)
+				namePrefix, selection, containingTypedef, queryOptions,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -678,10 +707,12 @@ func (g *generator) convertSelectionSet(
 			case *goStructType, *goInterfaceType:
 				// TODO(benkraft): Keep track of the position of each
 				// selection, so we can put this error on the right line.
-				return nil, errorf(nil,
+				return nil, errorf(
+					nil,
 					"genqlient doesn't allow duplicate fields with different selections "+
-						"(see https://github.com/Khan/genqlient/issues/64); "+
-						"duplicate field: %s.%s", containingTypedef.Name, field.JSONName)
+						"(see https://github.com/qwenode/genqlient/issues/64); "+
+						"duplicate field: %s.%s", containingTypedef.Name, field.JSONName,
+				)
 			default:
 				return nil, errorf(nil, "unexpected field-type: %T", field.GoType.Unwrap())
 			}
@@ -761,8 +792,10 @@ func (g *generator) convertInlineFragment(
 	if !fragmentMatches(containingTypedef, fragmentTypedef) {
 		return nil, nil
 	}
-	return g.convertSelectionSet(namePrefix, fragment.SelectionSet,
-		containingTypedef, queryOptions)
+	return g.convertSelectionSet(
+		namePrefix, fragment.SelectionSet,
+		containingTypedef, queryOptions,
+	)
 }
 
 // convertFragmentSpread converts a single GraphQL fragment-spread
@@ -836,7 +869,8 @@ func (g *generator) convertNamedFragment(fragment *ast.FragmentDefinition) (goTy
 	// things like type-names are a bit different.
 
 	fields, err := g.convertSelectionSet(
-		newPrefixList(fragment.Name), fragment.SelectionSet, typ, directive)
+		newPrefixList(fragment.Name), fragment.SelectionSet, typ, directive,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -864,7 +898,10 @@ func (g *generator) convertNamedFragment(fragment *ast.FragmentDefinition) (goTy
 	case ast.Interface, ast.Union:
 		implementationTypes := g.schema.GetPossibleTypes(typ)
 		// Make sure we generate stable output by sorting the types by name when we get them
-		sort.Slice(implementationTypes, func(i, j int) bool { return implementationTypes[i].Name < implementationTypes[j].Name })
+		sort.Slice(
+			implementationTypes,
+			func(i, j int) bool { return implementationTypes[i].Name < implementationTypes[j].Name },
+		)
 		goType := &goInterfaceType{
 			GoName:          fragment.Name,
 			SharedFields:    fields,
@@ -876,7 +913,8 @@ func (g *generator) convertNamedFragment(fragment *ast.FragmentDefinition) (goTy
 
 		for i, implDef := range implementationTypes {
 			implFields, err := g.convertSelectionSet(
-				newPrefixList(fragment.Name), fragment.SelectionSet, implDef, directive)
+				newPrefixList(fragment.Name), fragment.SelectionSet, implDef, directive,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -897,8 +935,10 @@ func (g *generator) convertNamedFragment(fragment *ast.FragmentDefinition) (goTy
 
 		return goType, nil
 	default:
-		return nil, errorf(fragment.Position, "invalid type for fragment: %v is a %v",
-			fragment.TypeCondition, typ.Kind)
+		return nil, errorf(
+			fragment.Position, "invalid type for fragment: %v is a %v",
+			fragment.TypeCondition, typ.Kind,
+		)
 	}
 }
 
@@ -917,7 +957,8 @@ func (g *generator) convertField(
 		// Unclear why gqlparser hasn't already rejected this,
 		// but empirically it might not.
 		return nil, errorf(
-			field.Position, "undefined field %v", field.Alias)
+			field.Position, "undefined field %v", field.Alias,
+		)
 	}
 
 	goName := upperFirst(field.Alias)
@@ -925,7 +966,8 @@ func (g *generator) convertField(
 
 	fieldGoType, err := g.convertType(
 		namePrefix, field.Definition.Type, field.SelectionSet,
-		fieldOptions, queryOptions)
+		fieldOptions, queryOptions,
+	)
 	if err != nil {
 		return nil, err
 	}
