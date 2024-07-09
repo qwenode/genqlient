@@ -399,12 +399,21 @@ func (typ *goStructType) WriteDefinition(w io.Writer, g *generator) error {
             // certain types are handled in our (Un)MarshalJSON (see below)
             jsonTag = `"-"`
         }
-        // Note for embedded types field.GoName is "", which produces the code
-        // we want!
-        fmt.Fprintf(
-            w, "\t%s %s `json:%s`\n",
-            field.GoName, field.GoType.Reference(), jsonTag,
-        )
+        reference := field.GoType.Reference()
+        if reference == "bool" && typ.IsInput {
+            fmt.Fprintf(
+                w, "\t%s *%s `json:%s`\n",
+                field.GoName, reference, jsonTag,
+            )
+        } else {
+            // Note for embedded types field.GoName is "", which produces the code
+            // we want!
+            fmt.Fprintf(
+                w, "\t%s %s `json:%s`\n",
+                field.GoName, field.GoType.Reference(), jsonTag,
+            )
+        }
+        
     }
     fmt.Fprintf(w, "}\n")
     
@@ -428,10 +437,20 @@ func (typ *goStructType) WriteDefinition(w io.Writer, g *generator) error {
             field.GoName, typ.GoName, field.GoName,
         )
         writeDescription(w, description)
-        fmt.Fprintf(
-            w, "func (v *%s) Get%s() %s { return v.%s }\n",
-            typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
-        )
+        
+        reference := field.GoType.Reference()
+        if reference == "bool" && typ.IsInput {
+            fmt.Fprintf(
+                w, "func (v *%s) Get%s() *%s { return v.%s }\n",
+                typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
+            )
+        } else {
+            fmt.Fprintf(
+                w, "func (v *%s) Get%s() %s { return v.%s }\n",
+                typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
+            )
+        }
+        
     }
     
     // Now, if needed, write the marshaler/unmarshaler.  We need one if we have
