@@ -432,27 +432,27 @@ func (typ *goStructType) WriteDefinition(w io.Writer, g *generator) error {
         return err
     }
     for _, field := range flattened {
-        description := fmt.Sprintf(
-            "Get%s returns %s.%s, and is useful for accessing the field via an interface.",
-            field.GoName, typ.GoName, field.GoName,
-        )
-        writeDescription(w, description)
+        // description := fmt.Sprintf(
+        //     "Get%s returns %s.%s, and is useful for accessing the field via an interface.",
+        //     field.GoName, typ.GoName, field.GoName,
+        // )
+        // writeDescription(w, description)
         
-        reference := field.GoType.Reference()
-        if reference == "bool" && typ.IsInput {
+        // reference := field.GoType.Reference()
+        // if reference == "bool" && typ.IsInput {
+        //     fmt.Fprintf(
+        //         w, "func (v *%s) Get%s() *%s { return v.%s }\n",
+        //         typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
+        //     )
+        // } else {
+        if strings.Contains(field.GoName, "Typename") {
             fmt.Fprintf(
-                w, "func (v *%s) Get%s() *%s { return v.%s }\n",
+                w, "func (v *%s) Get%s() %s { return v.%s }\n",
                 typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
             )
-        } else {
-            if strings.Contains(field.GoName, "Typename") {
-                fmt.Fprintf(
-                    w, "func (v *%s) Get%s() %s { return v.%s }\n",
-                    typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
-                )
-            }
-            
         }
+        
+        // }
         
     }
     
