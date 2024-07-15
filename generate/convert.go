@@ -294,7 +294,7 @@ func (g *generator) getStructReference(
     def *ast.Definition,
 ) bool {
     return g.Config.StructReferences &&
-        (def.Kind == ast.Object || def.Kind == ast.InputObject)
+        (def.Kind == ast.InputObject)
 }
 
 // convertDefinition decides the Go type we will generate corresponding to a

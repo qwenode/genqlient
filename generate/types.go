@@ -445,10 +445,13 @@ func (typ *goStructType) WriteDefinition(w io.Writer, g *generator) error {
                 typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
             )
         } else {
-            fmt.Fprintf(
-                w, "func (v *%s) Get%s() %s { return v.%s }\n",
-                typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
-            )
+            if strings.Contains(field.GoName, "Typename") {
+                fmt.Fprintf(
+                    w, "func (v *%s) Get%s() %s { return v.%s }\n",
+                    typ.GoName, field.GoName, field.GoType.Reference(), field.Selector,
+                )
+            }
+            
         }
         
     }
@@ -526,7 +529,9 @@ func (typ *goInterfaceType) WriteDefinition(w io.Writer, g *generator) error {
             fmt.Fprintf(w, "\t%s\n", sharedField.GoType.Reference())
             continue
         }
-        
+        if !strings.Contains(sharedField.GoName, "Typename") {
+            continue
+        }
         methodName := "Get" + sharedField.GoName
         description := ""
         if sharedField.GraphQLName == "__typename" {
